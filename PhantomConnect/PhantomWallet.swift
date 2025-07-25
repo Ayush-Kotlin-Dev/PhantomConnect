@@ -26,18 +26,15 @@ class PhantomWallet: ObservableObject {
     init() {
         self.dappKeyPair = Curve25519.KeyAgreement.PrivateKey()
         logger.debug("PhantomWallet initialized")
-        print("DEBUG: PhantomWallet initialized")
     }
     
     // MARK: - Step 1: Connect to Phantom
     func connect() {
         logger.debug("🚀 Starting connection to Phantom")
-        print("DEBUG: 🚀 Starting connection to Phantom")
 
         guard let appURL = URL(string: "https://phantom.app/ul/v1/connect") else {
             errorMessage = "Invalid Phantom URL"
             logger.error("Invalid Phantom URL")
-            print("ERROR: Invalid Phantom URL")
             return
         }
         
@@ -59,24 +56,20 @@ class PhantomWallet: ObservableObject {
         guard let finalURL = components.url else {
             errorMessage = "Failed to construct URL"
             logger.error("Failed to construct URL")
-            print("ERROR: Failed to construct URL")
             isLoading = false
             return
         }
 
         logger.debug("📱 Opening Phantom app with URL: \(finalURL.absoluteString)")
-        print("DEBUG: 📱 Opening Phantom app with URL: \(finalURL.absoluteString)")
 
         UIApplication.shared.open(finalURL) { [weak self] success in
             DispatchQueue.main.async {
                 if !success {
                     self?.errorMessage = "Failed to open Phantom app"
                     self?.logger.error("Failed to open Phantom app")
-                    print("ERROR: Failed to open Phantom app")
                     self?.isLoading = false
                 } else {
                     self?.logger.debug("✅ Successfully opened Phantom app")
-                    print("DEBUG: ✅ Successfully opened Phantom app")
                 }
             }
         }
@@ -85,7 +78,6 @@ class PhantomWallet: ObservableObject {
     // MARK: - Handle Connect Response
     func handleConnectResponse(url: URL) {
         logger.debug("📨 Handling connect response from URL: \(url.absoluteString)")
-        print("DEBUG: 📨 Handling connect response from URL: \(url.absoluteString)")
 
         isLoading = false
         
@@ -93,20 +85,17 @@ class PhantomWallet: ObservableObject {
               let queryItems = components.queryItems else {
             errorMessage = "Invalid response URL"
             logger.error("Invalid response URL")
-            print("ERROR: Invalid response URL")
             return
         }
         
         let queryDict = Dictionary(uniqueKeysWithValues: queryItems.map { ($0.name, $0.value ?? "") })
 
         logger.debug("📋 Query parameters: \(queryDict.keys.joined(separator: ", "))")
-        print("DEBUG: 📋 Query parameters: \(queryDict.keys.joined(separator: ", "))")
 
         // Check for errors
         if let errorCode = queryDict["errorCode"], let errorMessage = queryDict["errorMessage"] {
             self.errorMessage = "Connection failed: \(errorMessage) (Code: \(errorCode))"
             logger.error("Connection failed: \(errorMessage) (Code: \(errorCode))")
-            print("ERROR: Connection failed: \(errorMessage) (Code: \(errorCode))")
             return
         }
         
@@ -116,12 +105,10 @@ class PhantomWallet: ObservableObject {
               let encryptedDataBase58 = queryDict["data"] else {
             errorMessage = "Missing required response parameters"
             logger.error("Missing required response parameters")
-            print("ERROR: Missing required response parameters")
             return
         }
 
         logger.debug("🔐 Starting decryption process...")
-        print("DEBUG: 🔐 Starting decryption process...")
 
         do {
             // Get the required data for NaCl Box decryption
@@ -144,11 +131,6 @@ class PhantomWallet: ObservableObject {
             logger.debug("   Nonce length: \(nonceBytes.count)")
             logger.debug("   Encrypted data length: \(encryptedBytes.count)")
 
-            print("DEBUG: 🔍 NaCl Box decryption details:")
-            print("DEBUG:    Dapp private key length: \(dappPrivateKeyBytes.count)")
-            print("DEBUG:    Phantom public key length: \(phantomPublicKeyBytes.count)")
-            print("DEBUG:    Nonce length: \(nonceBytes.count)")
-            print("DEBUG:    Encrypted data length: \(encryptedBytes.count)")
 
             // Use NaCl Box.open for decryption (matching Android implementation)
             guard let decryptedBytes = self.sodium.box.open(authenticatedCipherText: encryptedBytes,
@@ -170,7 +152,6 @@ class PhantomWallet: ObservableObject {
             self.sharedSecret = Data(naclSharedSecret)
 
             logger.debug("✅ NaCl Box decryption successful")
-            print("DEBUG: ✅ NaCl Box decryption successful")
 
             // Parse the decrypted JSON
             if let json = try JSONSerialization.jsonObject(with: decryptedData) as? [String: Any],
@@ -178,7 +159,6 @@ class PhantomWallet: ObservableObject {
                let session = json["session"] as? String {
 
                 logger.debug("✅ JSON parsing successful - PublicKey: \(publicKey)")
-                print("DEBUG: ✅ JSON parsing successful - PublicKey: \(publicKey)")
 
                 DispatchQueue.main.async {
                     self.publicKey = publicKey
@@ -186,17 +166,14 @@ class PhantomWallet: ObservableObject {
                     self.isConnected = true
                     self.errorMessage = ""
                     self.logger.debug("🎉 Connection completed successfully!")
-                    print("DEBUG: 🎉 Connection completed successfully!")
                 }
             } else {
                 errorMessage = "Failed to parse connection response - Invalid JSON structure"
                 logger.error("Failed to parse connection response - Invalid JSON structure")
-                print("ERROR: Failed to parse connection response - Invalid JSON structure")
             }
         } catch {
             errorMessage = "Failed to decrypt response: \(error.localizedDescription) (\(type(of: error)))"
             logger.error("Failed to decrypt response: \(error.localizedDescription) (\(type(of: error)))")
-            print("ERROR: Failed to decrypt response: \(error.localizedDescription) (\(type(of: error)))")
         }
     }
     
@@ -205,14 +182,12 @@ class PhantomWallet: ObservableObject {
         guard isConnected, !session.isEmpty else {
             errorMessage = "Not connected to Phantom"
             logger.error("Not connected to Phantom")
-            print("ERROR: Not connected to Phantom")
             return
         }
         
         guard let appURL = URL(string: "https://phantom.app/ul/v1/signMessage") else {
             errorMessage = "Invalid Phantom URL"
             logger.error("Invalid Phantom URL")
-            print("ERROR: Invalid Phantom URL")
             return
         }
         
@@ -247,7 +222,6 @@ class PhantomWallet: ObservableObject {
             guard let finalURL = components.url else {
                 errorMessage = "Failed to construct URL"
                 logger.error("Failed to construct URL")
-                print("ERROR: Failed to construct URL")
                 isLoading = false
                 return
             }
@@ -263,7 +237,6 @@ class PhantomWallet: ObservableObject {
         } catch {
             errorMessage = "Failed to prepare message: \(error.localizedDescription)"
             logger.error("Failed to prepare message: \(error.localizedDescription)")
-            print("ERROR: Failed to prepare message: \(error.localizedDescription)")
             isLoading = false
         }
     }
@@ -276,7 +249,6 @@ class PhantomWallet: ObservableObject {
               let queryItems = components.queryItems else {
             errorMessage = "Invalid response URL"
             logger.error("Invalid response URL")
-            print("ERROR: Invalid response URL")
             return nil
         }
         
@@ -286,7 +258,6 @@ class PhantomWallet: ObservableObject {
         if let errorCode = queryDict["errorCode"], let errorMessage = queryDict["errorMessage"] {
             self.errorMessage = "Signing failed: \(errorMessage) (Code: \(errorCode))"
             logger.error("Signing failed: \(errorMessage) (Code: \(errorCode))")
-            print("ERROR: Signing failed: \(errorMessage) (Code: \(errorCode))")
             return nil
         }
         
@@ -295,7 +266,6 @@ class PhantomWallet: ObservableObject {
               let encryptedDataBase58 = queryDict["data"] else {
             errorMessage = "Missing required response parameters"
             logger.error("Missing required response parameters")
-            print("ERROR: Missing required response parameters")
             return nil
         }
         
@@ -311,13 +281,11 @@ class PhantomWallet: ObservableObject {
             } else {
                 errorMessage = "Failed to parse signature response"
                 logger.error("Failed to parse signature response")
-                print("ERROR: Failed to parse signature response")
                 return nil
             }
         } catch {
             errorMessage = "Failed to decrypt response: \(error.localizedDescription)"
             logger.error("Failed to decrypt response: \(error.localizedDescription)")
-            print("ERROR: Failed to decrypt response: \(error.localizedDescription)")
             return nil
         }
     }
@@ -338,10 +306,6 @@ class PhantomWallet: ObservableObject {
         logger.debug("   Nonce length: \(nonce.count)")
         logger.debug("   Shared secret length: \(sharedSecret.count)")
 
-        print("DEBUG: 🔐 Encrypting payload with SecretBox:")
-        print("DEBUG:    Message length: \(data.count)")
-        print("DEBUG:    Nonce length: \(nonce.count)")
-        print("DEBUG:    Shared secret length: \(sharedSecret.count)")
 
         // Encrypt using NaCl SecretBox with shared secret as key (matching Android)
         guard let encrypted = self.sodium.secretBox.seal(
@@ -354,7 +318,6 @@ class PhantomWallet: ObservableObject {
         }
 
         logger.debug("✅ SecretBox encryption successful, encrypted length: \(encrypted.count)")
-        print("DEBUG: ✅ SecretBox encryption successful, encrypted length: \(encrypted.count)")
 
         return (
             data: Data(encrypted).base58EncodedString,
@@ -379,16 +342,10 @@ class PhantomWallet: ObservableObject {
         logger.debug("   Shared secret length: \(sharedSecret.count)")
         logger.debug("   Expected nonce length: \(self.sodium.secretBox.NonceBytes)")
 
-        print("DEBUG: 🔍 NaCl SecretBox decryption details:")
-        print("DEBUG:    Nonce length: \(nonceData.count)")
-        print("DEBUG:    Encrypted data length: \(encryptedDataBytes.count)")
-        print("DEBUG:    Shared secret length: \(sharedSecret.count)")
-        print("DEBUG:    Expected nonce length: \(self.sodium.secretBox.NonceBytes)")
 
         // Validate lengths
         guard nonceData.count == self.sodium.secretBox.NonceBytes else {
             logger.error("Invalid nonce length: expected \(self.sodium.secretBox.NonceBytes), got \(nonceData.count)")
-            print("ERROR: Invalid nonce length: expected \(self.sodium.secretBox.NonceBytes), got \(nonceData.count)")
             throw PhantomError.invalidResponse
         }
 
@@ -400,30 +357,23 @@ class PhantomWallet: ObservableObject {
         )
         else {
             logger.error("SecretBox decryption failed with separate nonce/ciphertext")
-            print("ERROR: SecretBox decryption failed with separate nonce/ciphertext")
 
             // Try method 2: Combined nonce and ciphertext (fallback)
             logger.debug("Trying fallback method with combined nonce+ciphertext")
-            print("DEBUG: Trying fallback method with combined nonce+ciphertext")
-
             guard let fallbackDecrypted = self.sodium.secretBox.open(
                 nonceAndAuthenticatedCipherText: Array(encryptedDataBytes),
                 secretKey: Array(sharedSecret)
             )
             else {
                 logger.error("Both SecretBox decryption methods failed")
-                print("ERROR: Both SecretBox decryption methods failed")
                 throw PhantomError.invalidResponse
             }
 
             logger.debug("✅ NaCl SecretBox decryption successful with fallback method")
-            print("DEBUG: ✅ NaCl SecretBox decryption successful with fallback method")
             return Data(fallbackDecrypted)
         }
 
         logger.debug("✅ NaCl SecretBox decryption successful")
-        print("DEBUG: ✅ NaCl SecretBox decryption successful")
-
         return Data(decrypted)
     }
     

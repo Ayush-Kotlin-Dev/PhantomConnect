@@ -299,14 +299,12 @@ struct ContentView: View {
 
     private func addDebugLog(_ message: String) {
         logger.debug("\(message)")
-        print("DEBUG: \(message)")
         let timestamp = DateFormatter.debugTimeFormatter.string(from: Date())
         debugLogs.append("[\(timestamp)] \(message)")
     }
 
     private func handleDeepLink(_ url: URL) {
         logger.debug("🔗 Deep link received: \(url.absoluteString)")
-        print("DEBUG: 🔗 Deep link received: \(url.absoluteString)")
 
         addDebugLog("🔗 Deep link received: \(url.absoluteString)")
 
@@ -377,7 +375,6 @@ struct ContentView: View {
 
         guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
             logger.error("Could not access documents directory")
-            print("ERROR: Could not access documents directory")
             return
         }
 
@@ -386,7 +383,6 @@ struct ContentView: View {
         do {
             try fullContent.write(to: fileURL, atomically: true, encoding: .utf8)
             logger.debug("✅ Logs saved to: \(fileURL.path)")
-            print("DEBUG: ✅ Logs saved to: \(fileURL.path)")
             addDebugLog("💾 Logs saved to file: \(fileName)")
 
             // Show share sheet to export the file
@@ -408,7 +404,6 @@ struct ContentView: View {
             }
         } catch {
             logger.error("Failed to save logs: \(error.localizedDescription)")
-            print("ERROR: Failed to save logs: \(error.localizedDescription)")
             addDebugLog("❌ Failed to save logs: \(error.localizedDescription)")
         }
     }

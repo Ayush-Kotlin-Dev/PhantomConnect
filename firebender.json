@@ -3,6 +3,6 @@
   "rules": [
     "Project is a ios native app for testing a small feature",
     "Dont use any android tools like gradle sync etc",
-    "Goal is to make an app which connects with phantom wallet and can sign the message"
+    "This is working app with 2 step proccess connect and signin"
   ]
 }
