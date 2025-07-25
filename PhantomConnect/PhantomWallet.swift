@@ -8,6 +8,7 @@
 import Foundation
 import CryptoKit
 import UIKit
+import os
 
 class PhantomWallet: ObservableObject {
     @Published var isConnected = false
@@ -18,15 +19,23 @@ class PhantomWallet: ObservableObject {
     private var session: String = ""
     private var dappKeyPair: Curve25519.KeyAgreement.PrivateKey
     private var sharedSecret: SymmetricKey?
+    private let logger = Logger(subsystem: "com.phantomconnect.app", category: "PhantomWallet")
     
     init() {
         self.dappKeyPair = Curve25519.KeyAgreement.PrivateKey()
+        logger.debug("PhantomWallet initialized")
+        print("DEBUG: PhantomWallet initialized")
     }
     
     // MARK: - Step 1: Connect to Phantom
     func connect() {
+        logger.debug("🚀 Starting connection to Phantom")
+        print("DEBUG: 🚀 Starting connection to Phantom")
+
         guard let appURL = URL(string: "https://phantom.app/ul/v1/connect") else {
             errorMessage = "Invalid Phantom URL"
+            logger.error("Invalid Phantom URL")
+            print("ERROR: Invalid Phantom URL")
             return
         }
         
@@ -47,15 +56,25 @@ class PhantomWallet: ObservableObject {
         
         guard let finalURL = components.url else {
             errorMessage = "Failed to construct URL"
+            logger.error("Failed to construct URL")
+            print("ERROR: Failed to construct URL")
             isLoading = false
             return
         }
-        
+
+        logger.debug("📱 Opening Phantom app with URL: \(finalURL.absoluteString)")
+        print("DEBUG: 📱 Opening Phantom app with URL: \(finalURL.absoluteString)")
+
         UIApplication.shared.open(finalURL) { [weak self] success in
             DispatchQueue.main.async {
                 if !success {
                     self?.errorMessage = "Failed to open Phantom app"
+                    self?.logger.error("Failed to open Phantom app")
+                    print("ERROR: Failed to open Phantom app")
                     self?.isLoading = false
+                } else {
+                    self?.logger.debug("✅ Successfully opened Phantom app")
+                    print("DEBUG: ✅ Successfully opened Phantom app")
                 }
             }
         }
@@ -63,19 +82,29 @@ class PhantomWallet: ObservableObject {
     
     // MARK: - Handle Connect Response
     func handleConnectResponse(url: URL) {
+        logger.debug("📨 Handling connect response from URL: \(url.absoluteString)")
+        print("DEBUG: 📨 Handling connect response from URL: \(url.absoluteString)")
+
         isLoading = false
         
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let queryItems = components.queryItems else {
             errorMessage = "Invalid response URL"
+            logger.error("Invalid response URL")
+            print("ERROR: Invalid response URL")
             return
         }
         
         let queryDict = Dictionary(uniqueKeysWithValues: queryItems.map { ($0.name, $0.value ?? "") })
-        
+
+        logger.debug("📋 Query parameters: \(queryDict.keys.joined(separator: ", "))")
+        print("DEBUG: 📋 Query parameters: \(queryDict.keys.joined(separator: ", "))")
+
         // Check for errors
         if let errorCode = queryDict["errorCode"], let errorMessage = queryDict["errorMessage"] {
             self.errorMessage = "Connection failed: \(errorMessage) (Code: \(errorCode))"
+            logger.error("Connection failed: \(errorMessage) (Code: \(errorCode))")
+            print("ERROR: Connection failed: \(errorMessage) (Code: \(errorCode))")
             return
         }
         
@@ -84,9 +113,14 @@ class PhantomWallet: ObservableObject {
               let nonceBase58 = queryDict["nonce"],
               let encryptedDataBase58 = queryDict["data"] else {
             errorMessage = "Missing required response parameters"
+            logger.error("Missing required response parameters")
+            print("ERROR: Missing required response parameters")
             return
         }
-        
+
+        logger.debug("🔐 Starting decryption process...")
+        print("DEBUG: 🔐 Starting decryption process...")
+
         do {
             // Decrypt the response
             let decryptedData = try decryptPayload(
@@ -94,23 +128,35 @@ class PhantomWallet: ObservableObject {
                 nonce: nonceBase58,
                 phantomPublicKey: phantomPublicKeyBase58
             )
-            
+
+            logger.debug("✅ Decryption successful, parsing JSON...")
+            print("DEBUG: ✅ Decryption successful, parsing JSON...")
+
             // Parse the decrypted JSON
             if let json = try JSONSerialization.jsonObject(with: decryptedData) as? [String: Any],
                let publicKey = json["public_key"] as? String,
                let session = json["session"] as? String {
-                
+
+                logger.debug("✅ JSON parsing successful - PublicKey: \(publicKey)")
+                print("DEBUG: ✅ JSON parsing successful - PublicKey: \(publicKey)")
+
                 DispatchQueue.main.async {
                     self.publicKey = publicKey
                     self.session = session
                     self.isConnected = true
                     self.errorMessage = ""
+                    self.logger.debug("🎉 Connection completed successfully!")
+                    print("DEBUG: 🎉 Connection completed successfully!")
                 }
             } else {
                 errorMessage = "Failed to parse connection response - Invalid JSON structure"
+                logger.error("Failed to parse connection response - Invalid JSON structure")
+                print("ERROR: Failed to parse connection response - Invalid JSON structure")
             }
         } catch {
             errorMessage = "Failed to decrypt response: \(error.localizedDescription) (\(type(of: error)))"
+            logger.error("Failed to decrypt response: \(error.localizedDescription) (\(type(of: error)))")
+            print("ERROR: Failed to decrypt response: \(error.localizedDescription) (\(type(of: error)))")
         }
     }
     
@@ -118,11 +164,15 @@ class PhantomWallet: ObservableObject {
     func signMessage(_ message: String) {
         guard isConnected, !session.isEmpty else {
             errorMessage = "Not connected to Phantom"
+            logger.error("Not connected to Phantom")
+            print("ERROR: Not connected to Phantom")
             return
         }
         
         guard let appURL = URL(string: "https://phantom.app/ul/v1/signMessage") else {
             errorMessage = "Invalid Phantom URL"
+            logger.error("Invalid Phantom URL")
+            print("ERROR: Invalid Phantom URL")
             return
         }
         
@@ -156,6 +206,8 @@ class PhantomWallet: ObservableObject {
             
             guard let finalURL = components.url else {
                 errorMessage = "Failed to construct URL"
+                logger.error("Failed to construct URL")
+                print("ERROR: Failed to construct URL")
                 isLoading = false
                 return
             }
@@ -170,6 +222,8 @@ class PhantomWallet: ObservableObject {
             }
         } catch {
             errorMessage = "Failed to prepare message: \(error.localizedDescription)"
+            logger.error("Failed to prepare message: \(error.localizedDescription)")
+            print("ERROR: Failed to prepare message: \(error.localizedDescription)")
             isLoading = false
         }
     }
@@ -181,6 +235,8 @@ class PhantomWallet: ObservableObject {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let queryItems = components.queryItems else {
             errorMessage = "Invalid response URL"
+            logger.error("Invalid response URL")
+            print("ERROR: Invalid response URL")
             return nil
         }
         
@@ -189,6 +245,8 @@ class PhantomWallet: ObservableObject {
         // Check for errors
         if let errorCode = queryDict["errorCode"], let errorMessage = queryDict["errorMessage"] {
             self.errorMessage = "Signing failed: \(errorMessage) (Code: \(errorCode))"
+            logger.error("Signing failed: \(errorMessage) (Code: \(errorCode))")
+            print("ERROR: Signing failed: \(errorMessage) (Code: \(errorCode))")
             return nil
         }
         
@@ -196,6 +254,8 @@ class PhantomWallet: ObservableObject {
         guard let nonceBase58 = queryDict["nonce"],
               let encryptedDataBase58 = queryDict["data"] else {
             errorMessage = "Missing required response parameters"
+            logger.error("Missing required response parameters")
+            print("ERROR: Missing required response parameters")
             return nil
         }
         
@@ -211,10 +271,14 @@ class PhantomWallet: ObservableObject {
                 return signature
             } else {
                 errorMessage = "Failed to parse signature response"
+                logger.error("Failed to parse signature response")
+                print("ERROR: Failed to parse signature response")
                 return nil
             }
         } catch {
             errorMessage = "Failed to decrypt response: \(error.localizedDescription)"
+            logger.error("Failed to decrypt response: \(error.localizedDescription)")
+            print("ERROR: Failed to decrypt response: \(error.localizedDescription)")
             return nil
         }
     }

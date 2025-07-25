@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import os
 
 struct ContentView: View {
     @StateObject private var phantomWallet = PhantomWallet()
@@ -13,7 +14,9 @@ struct ContentView: View {
     @State private var signature: String = ""
     @State private var showingSignatureAlert = false
     @State private var debugLogs: [String] = []
-    
+
+    private let logger = Logger(subsystem: "com.phantomconnect.app", category: "DeepLink")
+
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
@@ -287,11 +290,16 @@ struct ContentView: View {
     }
 
     private func addDebugLog(_ message: String) {
+        logger.debug("\(message)")
+        print("DEBUG: \(message)")
         let timestamp = DateFormatter.debugTimeFormatter.string(from: Date())
         debugLogs.append("[\(timestamp)] \(message)")
     }
 
     private func handleDeepLink(_ url: URL) {
+        logger.debug("🔗 Deep link received: \(url.absoluteString)")
+        print("DEBUG: 🔗 Deep link received: \(url.absoluteString)")
+
         addDebugLog("🔗 Deep link received: \(url.absoluteString)")
 
         guard url.scheme == "phantomconnect" else {
