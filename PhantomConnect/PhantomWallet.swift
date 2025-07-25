@@ -9,6 +9,7 @@ import Foundation
 import CryptoKit
 import UIKit
 import os
+import Sodium
 
 class PhantomWallet: ObservableObject {
     @Published var isConnected = false
@@ -18,8 +19,9 @@ class PhantomWallet: ObservableObject {
     
     private var session: String = ""
     private var dappKeyPair: Curve25519.KeyAgreement.PrivateKey
-    private var sharedSecret: SymmetricKey?
+    private var sharedSecret: Data?
     private let logger = Logger(subsystem: "com.phantomconnect.app", category: "PhantomWallet")
+    private let sodium = Sodium()
     
     init() {
         self.dappKeyPair = Curve25519.KeyAgreement.PrivateKey()
@@ -122,15 +124,53 @@ class PhantomWallet: ObservableObject {
         print("DEBUG: 🔐 Starting decryption process...")
 
         do {
-            // Decrypt the response
-            let decryptedData = try decryptPayload(
-                encryptedData: encryptedDataBase58,
-                nonce: nonceBase58,
-                phantomPublicKey: phantomPublicKeyBase58
-            )
+            // Get the required data for NaCl Box decryption
+            guard let phantomPublicKeyData = Data(base58Encoded: phantomPublicKeyBase58),
+                  let nonceData = Data(base58Encoded: nonceBase58),
+                  let encryptedDataBytes = Data(base58Encoded: encryptedDataBase58)
+            else {
+                throw PhantomError.invalidResponse
+            }
 
-            logger.debug("✅ Decryption successful, parsing JSON...")
-            print("DEBUG: ✅ Decryption successful, parsing JSON...")
+            // Convert keys to format compatible with Sodium
+            let dappPrivateKeyBytes = Array(dappKeyPair.rawRepresentation)
+            let phantomPublicKeyBytes = Array(phantomPublicKeyData)
+            let nonceBytes = Array(nonceData)
+            let encryptedBytes = Array(encryptedDataBytes)
+
+            logger.debug("🔍 NaCl Box decryption details:")
+            logger.debug("   Dapp private key length: \(dappPrivateKeyBytes.count)")
+            logger.debug("   Phantom public key length: \(phantomPublicKeyBytes.count)")
+            logger.debug("   Nonce length: \(nonceBytes.count)")
+            logger.debug("   Encrypted data length: \(encryptedBytes.count)")
+
+            print("DEBUG: 🔍 NaCl Box decryption details:")
+            print("DEBUG:    Dapp private key length: \(dappPrivateKeyBytes.count)")
+            print("DEBUG:    Phantom public key length: \(phantomPublicKeyBytes.count)")
+            print("DEBUG:    Nonce length: \(nonceBytes.count)")
+            print("DEBUG:    Encrypted data length: \(encryptedBytes.count)")
+
+            // Use NaCl Box.open for decryption (matching Android implementation)
+            guard let decryptedBytes = sodium.box.open(authenticatedCipherText: encryptedBytes,
+                                                       senderPublicKey: phantomPublicKeyBytes,
+                                                       recipientSecretKey: dappPrivateKeyBytes,
+                                                       nonce: nonceBytes)
+            else {
+                throw PhantomError.invalidResponse
+            }
+
+            let decryptedData = Data(decryptedBytes)
+
+            // Now create shared secret for future operations (like Android does)
+            guard let naclSharedSecret = sodium.box.beforenm(recipientPublicKey: phantomPublicKeyBytes,
+                                                             senderSecretKey: dappPrivateKeyBytes)
+            else {
+                throw PhantomError.invalidResponse
+            }
+            self.sharedSecret = Data(naclSharedSecret)
+
+            logger.debug("✅ NaCl Box decryption successful")
+            print("DEBUG: ✅ NaCl Box decryption successful")
 
             // Parse the decrypted JSON
             if let json = try JSONSerialization.jsonObject(with: decryptedData) as? [String: Any],
@@ -262,8 +302,7 @@ class PhantomWallet: ObservableObject {
         do {
             let decryptedData = try decryptPayload(
                 encryptedData: encryptedDataBase58,
-                nonce: nonceBase58,
-                phantomPublicKey: nil // Use existing shared secret
+                nonce: nonceBase58
             )
             
             if let json = try JSONSerialization.jsonObject(with: decryptedData) as? [String: Any],
@@ -288,34 +327,62 @@ class PhantomWallet: ObservableObject {
         guard let sharedSecret = sharedSecret else {
             throw PhantomError.noSharedSecret
         }
-        
-        let nonce = AES.GCM.Nonce()
-        let sealedBox = try AES.GCM.seal(data, using: sharedSecret, nonce: nonce)
-        
+
+        // Generate a random 24-byte nonce for NaCl SecretBox
+        guard let nonce = sodium.randomBytes.buf(length: 24) else {
+            throw PhantomError.invalidResponse
+        }
+
+        // Encrypt using NaCl SecretBox with shared secret as key (matching Android)
+        guard let encrypted = sodium.secretBox.seal(
+            message: Array(data),
+            secretKey: Array(sharedSecret),
+            nonce: nonce
+        )
+        else {
+            throw PhantomError.invalidResponse
+        }
+
         return (
-            data: sealedBox.ciphertext.base58EncodedString,
+            data: Data(encrypted).base58EncodedString,
             nonce: Data(nonce).base58EncodedString
         )
     }
-    
-    private func decryptPayload(encryptedData: String, nonce: String, phantomPublicKey: String?) throws -> Data {
-        // If phantom public key is provided, create shared secret
-        if let phantomPublicKeyBase58 = phantomPublicKey {
-            let phantomPublicKeyData = Data(base58Encoded: phantomPublicKeyBase58)!
-            let phantomPublicKey = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: phantomPublicKeyData)
-            let sharedSecretData = try dappKeyPair.sharedSecretFromKeyAgreement(with: phantomPublicKey)
-            self.sharedSecret = SymmetricKey(data: sharedSecretData)
-        }
-        
+
+    private func decryptPayload(encryptedData: String, nonce: String) throws -> Data {
         guard let sharedSecret = sharedSecret else {
             throw PhantomError.noSharedSecret
         }
-        
-        let nonceData = Data(base58Encoded: nonce)!
-        let encryptedDataBytes = Data(base58Encoded: encryptedData)!
-        
-        let sealedBox = try AES.GCM.SealedBox(nonce: AES.GCM.Nonce(data: nonceData), ciphertext: encryptedDataBytes, tag: Data())
-        return try AES.GCM.open(sealedBox, using: sharedSecret)
+
+        guard let nonceData = Data(base58Encoded: nonce),
+              let encryptedDataBytes = Data(base58Encoded: encryptedData)
+        else {
+            throw PhantomError.invalidResponse
+        }
+
+        logger.debug("🔍 NaCl SecretBox decryption details:")
+        logger.debug("   Nonce length: \(nonceData.count)")
+        logger.debug("   Encrypted data length: \(encryptedDataBytes.count)")
+        logger.debug("   Shared secret length: \(sharedSecret.count)")
+
+        print("DEBUG: 🔍 NaCl SecretBox decryption details:")
+        print("DEBUG:    Nonce length: \(nonceData.count)")
+        print("DEBUG:    Encrypted data length: \(encryptedDataBytes.count)")
+        print("DEBUG:    Shared secret length: \(sharedSecret.count)")
+
+        // Use NaCl SecretBox to decrypt with shared secret as key (matching Android)
+        guard let decrypted = sodium.secretBox.open(
+            nonceAndAuthenticatedCipherText: Array(encryptedDataBytes),
+            secretKey: Array(sharedSecret)
+        )
+        else {
+            throw PhantomError.invalidResponse
+        }
+
+        logger.debug("✅ NaCl SecretBox decryption successful")
+        print("DEBUG: ✅ NaCl SecretBox decryption successful")
+
+        return Data(decrypted)
     }
     
     // MARK: - Disconnect
