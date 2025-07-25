@@ -6,13 +6,32 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		2A550ABF2E34184C00D352D8 /* Clibsodium in Frameworks */ = {isa = PBXBuildFile; productRef = 2A550ABE2E34184C00D352D8 /* Clibsodium */; };
+		2A550AC12E34184C00D352D8 /* Sodium in Frameworks */ = {isa = PBXBuildFile; productRef = 2A550AC02E34184C00D352D8 /* Sodium */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		2A4162E42E33FC2400DDB30B /* PhantomConnect.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PhantomConnect.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2A4162F22E33FC2500DDB30B /* PhantomConnect/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PhantomConnect/Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		2A4162F32E33FC2500DDB30B /* Exceptions for "PhantomConnect" folder in "PhantomConnect" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 2A4162E32E33FC2400DDB30B /* PhantomConnect */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2A4162E62E33FC2400DDB30B /* PhantomConnect */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				2A4162F32E33FC2500DDB30B /* Exceptions for "PhantomConnect" folder in "PhantomConnect" target */,
+			);
 			path = PhantomConnect;
 			sourceTree = "<group>";
 		};
@@ -23,6 +42,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2A550ABF2E34184C00D352D8 /* Clibsodium in Frameworks */,
+				2A550AC12E34184C00D352D8 /* Sodium in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -33,6 +54,7 @@
 			isa = PBXGroup;
 			children = (
 				2A4162E62E33FC2400DDB30B /* PhantomConnect */,
+				2A4162F22E33FC2500DDB30B /* PhantomConnect/Info.plist */,
 				2A4162E52E33FC2400DDB30B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -65,6 +87,8 @@
 			);
 			name = PhantomConnect;
 			packageProductDependencies = (
+				2A550ABE2E34184C00D352D8 /* Clibsodium */,
+				2A550AC02E34184C00D352D8 /* Sodium */,
 			);
 			productName = PhantomConnect;
 			productReference = 2A4162E42E33FC2400DDB30B /* PhantomConnect.app */;
@@ -94,6 +118,9 @@
 			);
 			mainGroup = 2A4162DB2E33FC2400DDB30B;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				2A550ABD2E34184C00D352D8 /* XCRemoteSwiftPackageReference "swift-sodium" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2A4162E52E33FC2400DDB30B /* Products */;
 			projectDirPath = "";
@@ -255,12 +282,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = XJJ7A4FS8B;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PhantomConnect/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -284,12 +307,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = XJJ7A4FS8B;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = PhantomConnect/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -326,6 +345,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		2A550ABD2E34184C00D352D8 /* XCRemoteSwiftPackageReference "swift-sodium" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jedisct1/swift-sodium.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2A550ABE2E34184C00D352D8 /* Clibsodium */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2A550ABD2E34184C00D352D8 /* XCRemoteSwiftPackageReference "swift-sodium" */;
+			productName = Clibsodium;
+		};
+		2A550AC02E34184C00D352D8 /* Sodium */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2A550ABD2E34184C00D352D8 /* XCRemoteSwiftPackageReference "swift-sodium" */;
+			productName = Sodium;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2A4162DC2E33FC2400DDB30B /* Project object */;
 }

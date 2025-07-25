@@ -107,10 +107,10 @@ class PhantomWallet: ObservableObject {
                     self.errorMessage = ""
                 }
             } else {
-                errorMessage = "Failed to parse connection response"
+                errorMessage = "Failed to parse connection response - Invalid JSON structure"
             }
         } catch {
-            errorMessage = "Failed to decrypt response: \(error.localizedDescription)"
+            errorMessage = "Failed to decrypt response: \(error.localizedDescription) (\(type(of: error)))"
         }
     }
     
