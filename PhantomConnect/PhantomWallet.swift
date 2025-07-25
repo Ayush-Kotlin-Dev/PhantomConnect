@@ -151,7 +151,7 @@ class PhantomWallet: ObservableObject {
             print("DEBUG:    Encrypted data length: \(encryptedBytes.count)")
 
             // Use NaCl Box.open for decryption (matching Android implementation)
-            guard let decryptedBytes = sodium.box.open(authenticatedCipherText: encryptedBytes,
+            guard let decryptedBytes = self.sodium.box.open(authenticatedCipherText: encryptedBytes,
                                                        senderPublicKey: phantomPublicKeyBytes,
                                                        recipientSecretKey: dappPrivateKeyBytes,
                                                        nonce: nonceBytes)
@@ -162,7 +162,7 @@ class PhantomWallet: ObservableObject {
             let decryptedData = Data(decryptedBytes)
 
             // Now create shared secret for future operations (like Android does)
-            guard let naclSharedSecret = sodium.box.beforenm(recipientPublicKey: phantomPublicKeyBytes,
+            guard let naclSharedSecret = self.sodium.box.beforenm(recipientPublicKey: phantomPublicKeyBytes,
                                                              senderSecretKey: dappPrivateKeyBytes)
             else {
                 throw PhantomError.invalidResponse
@@ -328,13 +328,23 @@ class PhantomWallet: ObservableObject {
             throw PhantomError.noSharedSecret
         }
 
-        // Generate a random 24-byte nonce for NaCl SecretBox
-        guard let nonce = sodium.randomBytes.buf(length: 24) else {
+        // Generate a random 24-byte nonce for NaCl SecretBox (matching Android)
+        guard let nonce = self.sodium.randomBytes.buf(length: self.sodium.secretBox.NonceBytes) else {
             throw PhantomError.invalidResponse
         }
 
+        logger.debug("🔐 Encrypting payload with SecretBox:")
+        logger.debug("   Message length: \(data.count)")
+        logger.debug("   Nonce length: \(nonce.count)")
+        logger.debug("   Shared secret length: \(sharedSecret.count)")
+
+        print("DEBUG: 🔐 Encrypting payload with SecretBox:")
+        print("DEBUG:    Message length: \(data.count)")
+        print("DEBUG:    Nonce length: \(nonce.count)")
+        print("DEBUG:    Shared secret length: \(sharedSecret.count)")
+
         // Encrypt using NaCl SecretBox with shared secret as key (matching Android)
-        guard let encrypted = sodium.secretBox.seal(
+        guard let encrypted = self.sodium.secretBox.seal(
             message: Array(data),
             secretKey: Array(sharedSecret),
             nonce: nonce
@@ -342,6 +352,9 @@ class PhantomWallet: ObservableObject {
         else {
             throw PhantomError.invalidResponse
         }
+
+        logger.debug("✅ SecretBox encryption successful, encrypted length: \(encrypted.count)")
+        print("DEBUG: ✅ SecretBox encryption successful, encrypted length: \(encrypted.count)")
 
         return (
             data: Data(encrypted).base58EncodedString,
@@ -364,19 +377,48 @@ class PhantomWallet: ObservableObject {
         logger.debug("   Nonce length: \(nonceData.count)")
         logger.debug("   Encrypted data length: \(encryptedDataBytes.count)")
         logger.debug("   Shared secret length: \(sharedSecret.count)")
+        logger.debug("   Expected nonce length: \(self.sodium.secretBox.NonceBytes)")
 
         print("DEBUG: 🔍 NaCl SecretBox decryption details:")
         print("DEBUG:    Nonce length: \(nonceData.count)")
         print("DEBUG:    Encrypted data length: \(encryptedDataBytes.count)")
         print("DEBUG:    Shared secret length: \(sharedSecret.count)")
+        print("DEBUG:    Expected nonce length: \(self.sodium.secretBox.NonceBytes)")
 
-        // Use NaCl SecretBox to decrypt with shared secret as key (matching Android)
-        guard let decrypted = sodium.secretBox.open(
-            nonceAndAuthenticatedCipherText: Array(encryptedDataBytes),
-            secretKey: Array(sharedSecret)
+        // Validate lengths
+        guard nonceData.count == self.sodium.secretBox.NonceBytes else {
+            logger.error("Invalid nonce length: expected \(self.sodium.secretBox.NonceBytes), got \(nonceData.count)")
+            print("ERROR: Invalid nonce length: expected \(self.sodium.secretBox.NonceBytes), got \(nonceData.count)")
+            throw PhantomError.invalidResponse
+        }
+
+        // Try method 1: Use separate nonce and ciphertext (matching Android EncryptionUtils)
+        guard let decrypted = self.sodium.secretBox.open(
+            authenticatedCipherText: Array(encryptedDataBytes),
+            secretKey: Array(sharedSecret),
+            nonce: Array(nonceData)
         )
         else {
-            throw PhantomError.invalidResponse
+            logger.error("SecretBox decryption failed with separate nonce/ciphertext")
+            print("ERROR: SecretBox decryption failed with separate nonce/ciphertext")
+
+            // Try method 2: Combined nonce and ciphertext (fallback)
+            logger.debug("Trying fallback method with combined nonce+ciphertext")
+            print("DEBUG: Trying fallback method with combined nonce+ciphertext")
+
+            guard let fallbackDecrypted = self.sodium.secretBox.open(
+                nonceAndAuthenticatedCipherText: Array(encryptedDataBytes),
+                secretKey: Array(sharedSecret)
+            )
+            else {
+                logger.error("Both SecretBox decryption methods failed")
+                print("ERROR: Both SecretBox decryption methods failed")
+                throw PhantomError.invalidResponse
+            }
+
+            logger.debug("✅ NaCl SecretBox decryption successful with fallback method")
+            print("DEBUG: ✅ NaCl SecretBox decryption successful with fallback method")
+            return Data(fallbackDecrypted)
         }
 
         logger.debug("✅ NaCl SecretBox decryption successful")
