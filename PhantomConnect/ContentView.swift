@@ -9,11 +9,15 @@ import SwiftUI
 import os
 
 struct ContentView: View {
-    @StateObject private var phantomWallet = PhantomWallet()
+    private let phantomWallet = PhantomWallet.shared
     @State private var messageToSign = "Hello from PhantomConnect! Test message for signing."
     @State private var signature: String = ""
     @State private var showingSignatureAlert = false
     @State private var debugLogs: [String] = []
+    @State private var isConnected = false
+    @State private var publicKey = ""
+    @State private var isLoading = false
+    @State private var errorMessage = ""
 
     private let logger = Logger(subsystem: "com.phantomconnect.app", category: "DeepLink")
 
@@ -30,6 +34,9 @@ struct ContentView: View {
             .padding()
             .navigationBarHidden(true)
         }
+        .onAppear {
+            updateUIState()
+        }
         .onOpenURL { url in
             handleDeepLink(url)
         }
@@ -39,6 +46,13 @@ struct ContentView: View {
         } message: {
             Text("Your message has been successfully signed!")
         }
+    }
+
+    private func updateUIState() {
+        isConnected = phantomWallet.isConnected
+        publicKey = phantomWallet.publicKey
+        isLoading = phantomWallet.isLoading
+        errorMessage = phantomWallet.errorMessage
     }
 
     private var headerView: some View {
@@ -62,7 +76,7 @@ struct ContentView: View {
         VStack(spacing: 15) {
             HStack {
                 Circle()
-                    .fill(phantomWallet.isConnected ? Color.green : Color.gray)
+                    .fill(isConnected ? Color.green : Color.gray)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Text("1")
@@ -80,14 +94,14 @@ struct ContentView: View {
 
                 Spacer()
 
-                if phantomWallet.isConnected {
+                if isConnected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                         .font(.title2)
                 }
             }
 
-            if phantomWallet.isConnected {
+            if isConnected {
                 connectedWalletInfo
             } else {
                 connectButton
@@ -103,7 +117,7 @@ struct ContentView: View {
             Text("Connected Wallet:")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Text(phantomWallet.publicKey)
+            Text(publicKey)
                 .font(.system(.caption, design: .monospaced))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -116,10 +130,19 @@ struct ContentView: View {
 
     private var connectButton: some View {
         Button(action: {
-            phantomWallet.connect()
+            phantomWallet.connect { success, error in
+                DispatchQueue.main.async {
+                    updateUIState()
+                    if success {
+                        addDebugLog("✅ Connection successful!")
+                    } else if let error = error {
+                        addDebugLog("❌ Connection failed: \(error)")
+                    }
+                }
+            }
         }) {
             HStack {
-                if phantomWallet.isLoading {
+                if isLoading {
                     ProgressView()
                         .scaleEffect(0.8)
                 } else {
@@ -133,14 +156,14 @@ struct ContentView: View {
             .foregroundColor(.white)
             .cornerRadius(10)
         }
-        .disabled(phantomWallet.isLoading)
+        .disabled(isLoading)
     }
 
     private var signStepView: some View {
         VStack(spacing: 15) {
             HStack {
                 Circle()
-                    .fill(phantomWallet.isConnected ? (signature.isEmpty ? Color.orange : Color.green) : Color.gray)
+                    .fill(isConnected ? (signature.isEmpty ? Color.orange : Color.green) : Color.gray)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Text("2")
@@ -165,7 +188,7 @@ struct ContentView: View {
                 }
             }
 
-            if phantomWallet.isConnected {
+            if isConnected {
                 signMessageContent
             } else {
                 Text("Complete step 1 first")
@@ -176,7 +199,7 @@ struct ContentView: View {
         .padding()
         .background(Color.gray.opacity(0.05))
         .cornerRadius(15)
-        .opacity(phantomWallet.isConnected ? 1.0 : 0.6)
+        .opacity(isConnected ? 1.0 : 0.6)
     }
 
     private var signMessageContent: some View {
@@ -185,10 +208,19 @@ struct ContentView: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
 
             Button(action: {
-                phantomWallet.signMessage(messageToSign)
+                phantomWallet.signMessage(messageToSign) { success, error in
+                    DispatchQueue.main.async {
+                        updateUIState()
+                        if success {
+                            addDebugLog("✅ Sign request sent!")
+                        } else if let error = error {
+                            addDebugLog("❌ Sign request failed: \(error)")
+                        }
+                    }
+                }
             }) {
                 HStack {
-                    if phantomWallet.isLoading {
+                    if isLoading {
                         ProgressView()
                             .scaleEffect(0.8)
                     } else {
@@ -202,7 +234,7 @@ struct ContentView: View {
                 .foregroundColor(.white)
                 .cornerRadius(10)
             }
-            .disabled(phantomWallet.isLoading || messageToSign.isEmpty)
+            .disabled(isLoading || messageToSign.isEmpty)
 
             if !signature.isEmpty {
                 signatureDisplay
@@ -227,8 +259,8 @@ struct ContentView: View {
 
     @ViewBuilder
     private var errorView: some View {
-        if !phantomWallet.errorMessage.isEmpty {
-            Text(phantomWallet.errorMessage)
+        if !errorMessage.isEmpty {
+            Text(errorMessage)
                 .foregroundColor(.red)
                 .padding()
                 .background(Color.red.opacity(0.1))
@@ -287,11 +319,12 @@ struct ContentView: View {
 
     @ViewBuilder
     private var disconnectButton: some View {
-        if phantomWallet.isConnected {
+        if isConnected {
             Button("Disconnect") {
                 phantomWallet.disconnect()
                 signature = ""
                 addDebugLog("Wallet disconnected")
+                updateUIState()
             }
             .foregroundColor(.red)
         }
@@ -335,20 +368,29 @@ struct ContentView: View {
         switch url.host {
         case "connected":
             addDebugLog("🔄 Processing connect response...")
-            phantomWallet.handleConnectResponse(url: url)
-            if phantomWallet.isConnected {
-                addDebugLog("✅ Connection successful!")
-            } else if !phantomWallet.errorMessage.isEmpty {
-                addDebugLog("❌ Connection failed: \(phantomWallet.errorMessage)")
+            phantomWallet.handleConnectResponse(url: url) { success, publicKey, error in
+                DispatchQueue.main.async {
+                    updateUIState()
+                    if success {
+                        addDebugLog("✅ Connection successful!")
+                    } else if let error = error {
+                        addDebugLog("❌ Connection failed: \(error)")
+                    }
+                }
             }
         case "signed":
             addDebugLog("🔄 Processing sign response...")
-            if let sig = phantomWallet.handleSignResponse(url: url) {
-                signature = sig
-                showingSignatureAlert = true
-                addDebugLog("✅ Message signed successfully!")
-            } else if !phantomWallet.errorMessage.isEmpty {
-                addDebugLog("❌ Signing failed: \(phantomWallet.errorMessage)")
+            phantomWallet.handleSignResponse(url: url) { sig, error in
+                DispatchQueue.main.async {
+                    updateUIState()
+                    if let sig = sig {
+                        signature = sig
+                        showingSignatureAlert = true
+                        addDebugLog("✅ Message signed successfully!")
+                    } else if let error = error {
+                        addDebugLog("❌ Signing failed: \(error)")
+                    }
+                }
             }
         default:
             addDebugLog("❌ Unknown host: \(url.host ?? "nil")")

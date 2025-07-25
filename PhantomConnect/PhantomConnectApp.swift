@@ -21,7 +21,5 @@ struct PhantomConnectApp: App {
     
     private func handleAppDeepLink(_ url: URL) {
         // This will be handled by ContentView's onOpenURL
-        // but we can add app-level logging here if needed
-        print("App received deep link: \(url)")
     }
 }
