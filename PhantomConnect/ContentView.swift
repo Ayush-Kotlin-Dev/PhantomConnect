@@ -251,6 +251,14 @@ struct ContentView: View {
             Text("Debug Logs")
                 .font(.headline)
             Spacer()
+
+            Button("Save Logs") {
+                saveLogsToFile()
+            }
+            .font(.caption)
+            .foregroundColor(.green)
+            .padding(.trailing, 8)
+
             Button("Clear") {
                 debugLogs.removeAll()
             }
@@ -349,6 +357,61 @@ struct ContentView: View {
             break
         }
     }
+
+    private func saveLogsToFile() {
+        let timestamp = DateFormatter.fileNameFormatter.string(from: Date())
+        let fileName = "PhantomConnect_Logs_\(timestamp).txt"
+
+        let logsContent = debugLogs.joined(separator: "\n")
+        let fullContent = """
+                          Phantom Connect Debug Logs
+                          Generated: \(DateFormatter.fullDateFormatter.string(from: Date()))
+
+                          ===========================================
+
+                          \(logsContent)
+
+                          ===========================================
+                          End of logs
+                          """
+
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            logger.error("Could not access documents directory")
+            print("ERROR: Could not access documents directory")
+            return
+        }
+
+        let fileURL = documentsDirectory.appendingPathComponent(fileName)
+
+        do {
+            try fullContent.write(to: fileURL, atomically: true, encoding: .utf8)
+            logger.debug("✅ Logs saved to: \(fileURL.path)")
+            print("DEBUG: ✅ Logs saved to: \(fileURL.path)")
+            addDebugLog("💾 Logs saved to file: \(fileName)")
+
+            // Show share sheet to export the file
+            DispatchQueue.main.async {
+                let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let window = windowScene.windows.first,
+                   let rootVC = window.rootViewController {
+
+                    // For iPad compatibility
+                    if let popover = activityVC.popoverPresentationController {
+                        popover.sourceView = window
+                        popover.sourceRect = CGRect(x: window.bounds.midX, y: window.bounds.midY, width: 0, height: 0)
+                        popover.permittedArrowDirections = []
+                    }
+
+                    rootVC.present(activityVC, animated: true)
+                }
+            }
+        } catch {
+            logger.error("Failed to save logs: \(error.localizedDescription)")
+            print("ERROR: Failed to save logs: \(error.localizedDescription)")
+            addDebugLog("❌ Failed to save logs: \(error.localizedDescription)")
+        }
+    }
 }
 
 struct DebugLogItemView: View {
@@ -380,7 +443,19 @@ extension DateFormatter {
         formatter.dateFormat = "HH:mm:ss.SSS"
         return formatter
     }()
+    static let fileNameFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        return formatter
+    }()
+    static let fullDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .medium
+        return formatter
+    }()
 }
+
 
 #Preview {
     ContentView()
