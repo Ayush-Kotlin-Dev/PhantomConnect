@@ -8,13 +8,12 @@
 import Foundation
 import CryptoKit
 import os
-import Sodium
+import TweetNacl
 
 class PhantomDeepLinkHandler {
     static let shared = PhantomDeepLinkHandler()
 
     private let logger = Logger(subsystem: "com.phantomconnect.app", category: "PhantomDeepLinkHandler")
-    private let sodium = Sodium()
 
     private init() {
     }
@@ -92,37 +91,23 @@ class PhantomDeepLinkHandler {
                 throw PhantomError.invalidResponse
             }
 
-            // Convert keys to format compatible with Sodium
-            let dappPrivateKeyBytes = Array(dappPrivateKeyData)
-            let phantomPublicKeyBytes = Array(phantomPublicKeyData)
-            let nonceBytes = Array(nonceData)
-            let encryptedBytes = Array(encryptedDataBytes)
-
             logger.debug("🔍 NaCl Box decryption details:")
-            logger.debug("   Dapp private key length: \(dappPrivateKeyBytes.count)")
-            logger.debug("   Phantom public key length: \(phantomPublicKeyBytes.count)")
-            logger.debug("   Nonce length: \(nonceBytes.count)")
-            logger.debug("   Encrypted data length: \(encryptedBytes.count)")
+            logger.debug("   Dapp private key length: \(dappPrivateKeyData.count)")
+            logger.debug("   Phantom public key length: \(phantomPublicKeyData.count)")
+            logger.debug("   Nonce length: \(nonceData.count)")
+            logger.debug("   Encrypted data length: \(encryptedDataBytes.count)")
 
             // Use NaCl Box.open for decryption
-            guard let decryptedBytes = self.sodium.box.open(authenticatedCipherText: encryptedBytes,
-                                                            senderPublicKey: phantomPublicKeyBytes,
-                                                            recipientSecretKey: dappPrivateKeyBytes,
-                                                            nonce: nonceBytes)
-            else {
-                throw PhantomError.invalidResponse
-            }
-
-            let decryptedData = Data(decryptedBytes)
+            let decryptedData = try NaclBox.open(message: encryptedDataBytes,
+                                                 nonce: nonceData,
+                                                 publicKey: phantomPublicKeyData,
+                                                 secretKey: dappPrivateKeyData)
 
             // Now create shared secret for future operations
-            guard let naclSharedSecret = self.sodium.box.beforenm(recipientPublicKey: phantomPublicKeyBytes,
-                                                                  senderSecretKey: dappPrivateKeyBytes)
-            else {
-                throw PhantomError.invalidResponse
-            }
+            let naclSharedSecret = try NaclBox.before(publicKey: phantomPublicKeyData,
+                                                      secretKey: dappPrivateKeyData)
 
-            PhantomState.shared.setSharedSecret(Data(naclSharedSecret))
+            PhantomState.shared.setSharedSecret(naclSharedSecret)
 
             logger.debug("✅ NaCl Box decryption successful")
 
@@ -225,39 +210,20 @@ class PhantomDeepLinkHandler {
         logger.debug("   Nonce length: \(nonceData.count)")
         logger.debug("   Encrypted data length: \(encryptedDataBytes.count)")
         logger.debug("   Shared secret length: \(sharedSecret.count)")
-        logger.debug("   Expected nonce length: \(self.sodium.secretBox.NonceBytes)")
+        logger.debug("   Expected nonce length: 24")
 
         // Validate lengths
-        guard nonceData.count == self.sodium.secretBox.NonceBytes else {
-            logger.error("Invalid nonce length: expected \(self.sodium.secretBox.NonceBytes), got \(nonceData.count)")
+        guard nonceData.count == 24 else {
+            logger.error("Invalid nonce length: expected 24, got \(nonceData.count)")
             throw PhantomError.invalidResponse
         }
 
-        // Try method 1: Use separate nonce and ciphertext
-        guard let decrypted = self.sodium.secretBox.open(
-            authenticatedCipherText: Array(encryptedDataBytes),
-            secretKey: Array(sharedSecret),
-            nonce: Array(nonceData)
-        )
-        else {
-            logger.error("SecretBox decryption failed with separate nonce/ciphertext")
-
-            // Try method 2: Combined nonce and ciphertext (fallback)
-            logger.debug("Trying fallback method with combined nonce+ciphertext")
-            guard let fallbackDecrypted = self.sodium.secretBox.open(
-                nonceAndAuthenticatedCipherText: Array(encryptedDataBytes),
-                secretKey: Array(sharedSecret)
-            )
-            else {
-                logger.error("Both SecretBox decryption methods failed")
-                throw PhantomError.invalidResponse
-            }
-
-            logger.debug("✅ NaCl SecretBox decryption successful with fallback method")
-            return Data(fallbackDecrypted)
-        }
+        // Use NaclSecretBox.open for decryption
+        let decrypted = try NaclSecretBox.open(box: encryptedDataBytes,
+                                               nonce: nonceData,
+                                               key: sharedSecret)
 
         logger.debug("✅ NaCl SecretBox decryption successful")
-        return Data(decrypted)
+        return decrypted
     }
 }

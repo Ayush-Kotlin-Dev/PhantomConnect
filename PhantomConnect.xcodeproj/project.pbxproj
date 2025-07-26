@@ -7,8 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2A550ABF2E34184C00D352D8 /* Clibsodium in Frameworks */ = {isa = PBXBuildFile; productRef = 2A550ABE2E34184C00D352D8 /* Clibsodium */; };
-		2A550AC12E34184C00D352D8 /* Sodium in Frameworks */ = {isa = PBXBuildFile; productRef = 2A550AC02E34184C00D352D8 /* Sodium */; };
+		2AEBFDB52E35228500B032EC /* TweetNacl in Frameworks */ = {isa = PBXBuildFile; productRef = 2AEBFDB42E35228500B032EC /* TweetNacl */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,8 +41,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2A550ABF2E34184C00D352D8 /* Clibsodium in Frameworks */,
-				2A550AC12E34184C00D352D8 /* Sodium in Frameworks */,
+				2AEBFDB52E35228500B032EC /* TweetNacl in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -87,8 +85,7 @@
 			);
 			name = PhantomConnect;
 			packageProductDependencies = (
-				2A550ABE2E34184C00D352D8 /* Clibsodium */,
-				2A550AC02E34184C00D352D8 /* Sodium */,
+				2AEBFDB42E35228500B032EC /* TweetNacl */,
 			);
 			productName = PhantomConnect;
 			productReference = 2A4162E42E33FC2400DDB30B /* PhantomConnect.app */;
@@ -119,7 +116,7 @@
 			mainGroup = 2A4162DB2E33FC2400DDB30B;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				2A550ABD2E34184C00D352D8 /* XCRemoteSwiftPackageReference "swift-sodium" */,
+				2AEBFDB32E35228500B032EC /* XCRemoteSwiftPackageReference "tweetnacl-swiftwrap" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2A4162E52E33FC2400DDB30B /* Products */;
@@ -347,26 +344,21 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		2A550ABD2E34184C00D352D8 /* XCRemoteSwiftPackageReference "swift-sodium" */ = {
+		2AEBFDB32E35228500B032EC /* XCRemoteSwiftPackageReference "tweetnacl-swiftwrap" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/jedisct1/swift-sodium.git";
+			repositoryURL = "https://github.com/bitmark-inc/tweetnacl-swiftwrap.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.9.1;
+				minimumVersion = 1.1.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		2A550ABE2E34184C00D352D8 /* Clibsodium */ = {
+		2AEBFDB42E35228500B032EC /* TweetNacl */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 2A550ABD2E34184C00D352D8 /* XCRemoteSwiftPackageReference "swift-sodium" */;
-			productName = Clibsodium;
-		};
-		2A550AC02E34184C00D352D8 /* Sodium */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 2A550ABD2E34184C00D352D8 /* XCRemoteSwiftPackageReference "swift-sodium" */;
-			productName = Sodium;
+			package = 2AEBFDB32E35228500B032EC /* XCRemoteSwiftPackageReference "tweetnacl-swiftwrap" */;
+			productName = TweetNacl;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

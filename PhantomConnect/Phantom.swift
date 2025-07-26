@@ -9,7 +9,7 @@ import Foundation
 import CryptoKit
 import UIKit
 import os
-import Sodium
+import TweetNacl
 
 @objc
 public class Phantom: NSObject, @unchecked Sendable {
@@ -184,12 +184,10 @@ public class Phantom: NSObject, @unchecked Sendable {
             throw PhantomError.noSharedSecret
         }
 
-        let sodium = Sodium()
-
         // Generate a random 24-byte nonce for NaCl SecretBox
-        guard let nonce = sodium.randomBytes.buf(length: sodium.secretBox.NonceBytes) else {
-            throw PhantomError.invalidResponse
-        }
+        let nonce = Data((0..<24).map { _ in
+            UInt8.random(in: 0...255)
+        })
 
         logger.debug("🔐 Encrypting payload with SecretBox:")
         logger.debug("   Message length: \(data.count)")
@@ -197,20 +195,13 @@ public class Phantom: NSObject, @unchecked Sendable {
         logger.debug("   Shared secret length: \(sharedSecret.count)")
 
         // Encrypt using NaCl SecretBox with shared secret as key
-        guard let encrypted = sodium.secretBox.seal(
-            message: Array(data),
-            secretKey: Array(sharedSecret),
-            nonce: nonce
-        )
-        else {
-            throw PhantomError.invalidResponse
-        }
+        let encrypted = try NaclSecretBox.secretBox(message: data, nonce: nonce, key: sharedSecret)
 
         logger.debug("✅ SecretBox encryption successful, encrypted length: \(encrypted.count)")
 
         return (
-            data: Data(encrypted).base58EncodedString,
-            nonce: Data(nonce).base58EncodedString
+            data: encrypted.base58EncodedString,
+            nonce: nonce.base58EncodedString
         )
     }
 

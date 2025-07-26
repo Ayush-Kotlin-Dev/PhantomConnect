@@ -8,6 +8,7 @@
 import SwiftUI
 import os
 
+
 struct ContentView: View {
     @StateObject private var phantomState = PhantomState.shared
     @State private var messageToSign = "Hello from PhantomConnect! Test message for signing."
