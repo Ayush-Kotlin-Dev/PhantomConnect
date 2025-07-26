@@ -13,13 +13,12 @@ struct PhantomConnectApp: App {
         WindowGroup {
             ContentView()
                 .onOpenURL { url in
-                    // Handle deep links at the app level
                     handleAppDeepLink(url)
                 }
         }
     }
     
     private func handleAppDeepLink(_ url: URL) {
-        // This will be handled by ContentView's onOpenURL
+        _ = PhantomDeepLinkHandler.shared.handleURL(url)
     }
 }

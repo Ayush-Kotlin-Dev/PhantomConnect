@@ -3,6 +3,7 @@
   "rules": [
     "Project is a ios native app for testing a small feature",
     "Dont use any android tools like gradle sync etc",
-    "This is working app with 2 step proccess connect and signin"
+    "This is working app with 2 step proccess connect and signin",
+    "we are just making this app to make the strucutre to resuable in kmp app "
   ]
 }
