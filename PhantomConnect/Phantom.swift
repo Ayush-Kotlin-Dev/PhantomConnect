@@ -19,11 +19,74 @@ public class Phantom: NSObject, @unchecked Sendable {
 
     private var dappKeyPair: Curve25519.KeyAgreement.PrivateKey
     private let logger = Logger(subsystem: "com.phantomconnect.app", category: "Phantom")
+    private let userDefaults = UserDefaults.standard
+
+    // Keys for UserDefaults
+    private enum Keys {
+        static let isConnected = "phantom_is_connected"
+        static let publicKey = "phantom_public_key"
+        static let session = "phantom_session"
+        static let sharedSecret = "phantom_shared_secret"
+        static let dappPublicKey = "phantom_dapp_public_key"
+        static let dappPrivateKey = "phantom_dapp_private_key"
+        static let isLoading = "phantom_is_loading"
+        static let errorMessage = "phantom_error_message"
+        static let signature = "phantom_signature"
+    }
 
     private override init() {
         self.dappKeyPair = Curve25519.KeyAgreement.PrivateKey()
         super.init()
         logger.debug("Phantom initialized")
+    }
+
+    // MARK: - UserDefaults Helpers
+    private func setLoading(_ loading: Bool) {
+        userDefaults.set(loading, forKey: Keys.isLoading)
+    }
+
+    private func setError(_ error: String) {
+        userDefaults.set(error, forKey: Keys.errorMessage)
+    }
+
+    private func clearError() {
+        userDefaults.set("", forKey: Keys.errorMessage)
+    }
+
+    private func setConnected(_ connected: Bool) {
+        userDefaults.set(connected, forKey: Keys.isConnected)
+    }
+
+    private func setPublicKey(_ key: String) {
+        userDefaults.set(key, forKey: Keys.publicKey)
+    }
+
+    private func setSession(_ sessionValue: String) {
+        userDefaults.set(sessionValue, forKey: Keys.session)
+    }
+
+    private func setSharedSecret(_ secret: Data) {
+        userDefaults.set(secret, forKey: Keys.sharedSecret)
+    }
+
+    private func setDappPublicKey(_ key: String) {
+        userDefaults.set(key, forKey: Keys.dappPublicKey)
+    }
+
+    private func setDappPrivateKey(_ key: Data) {
+        userDefaults.set(key, forKey: Keys.dappPrivateKey)
+    }
+
+    private var isConnected: Bool {
+        return userDefaults.bool(forKey: Keys.isConnected)
+    }
+
+    private var session: String {
+        return userDefaults.string(forKey: Keys.session) ?? ""
+    }
+
+    private var sharedSecret: Data? {
+        return userDefaults.data(forKey: Keys.sharedSecret)
     }
 
     // MARK: - Step 1: Connect to Phantom
@@ -34,7 +97,7 @@ public class Phantom: NSObject, @unchecked Sendable {
         guard let appURL = URL(string: "https://phantom.app/ul/v1/connect") else {
             let error = "Invalid Phantom URL"
             DispatchQueue.main.async {
-                PhantomState.shared.setError(error)
+                self.setError(error)
                 self.logger.error("Invalid Phantom URL")
                 completion(false, error)
             }
@@ -42,20 +105,20 @@ public class Phantom: NSObject, @unchecked Sendable {
         }
 
         DispatchQueue.main.async {
-            PhantomState.shared.setLoading(true)
-            PhantomState.shared.clearError()
+            self.setLoading(true)
+            self.clearError()
         }
 
         var components = URLComponents(url: appURL, resolvingAgainstBaseURL: false)!
 
         // Store dapp public key for later use
-        PhantomState.shared.setDappPublicKey(dappKeyPair.publicKey.rawRepresentation.base58EncodedString)
-        PhantomState.shared.setDappPrivateKey(dappKeyPair.rawRepresentation)
+        setDappPublicKey(dappKeyPair.publicKey.rawRepresentation.phantomBase58EncodedString)
+        setDappPrivateKey(dappKeyPair.rawRepresentation)
 
         // Required parameters for Phantom connect
         let queryItems = [
             URLQueryItem(name: "app_url", value: "https://myapp.com".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)),
-            URLQueryItem(name: "dapp_encryption_public_key", value: dappKeyPair.publicKey.rawRepresentation.base58EncodedString),
+            URLQueryItem(name: "dapp_encryption_public_key", value: dappKeyPair.publicKey.rawRepresentation.phantomBase58EncodedString),
             URLQueryItem(name: "redirect_link", value: "phantomconnect://connected".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)),
             URLQueryItem(name: "cluster", value: "mainnet-beta")
         ]
@@ -65,9 +128,9 @@ public class Phantom: NSObject, @unchecked Sendable {
         guard let finalURL = components.url else {
             let error = "Failed to construct URL"
             DispatchQueue.main.async {
-                PhantomState.shared.setError(error)
+                self.setError(error)
                 self.logger.error("Failed to construct URL")
-                PhantomState.shared.setLoading(false)
+                self.setLoading(false)
                 completion(false, error)
             }
             return
@@ -79,9 +142,9 @@ public class Phantom: NSObject, @unchecked Sendable {
             DispatchQueue.main.async {
                 if !success {
                     let error = "Failed to open Phantom app"
-                    PhantomState.shared.setError(error)
+                    self?.setError(error)
                     self?.logger.error("Failed to open Phantom app")
-                    PhantomState.shared.setLoading(false)
+                    self?.setLoading(false)
                     completion(false, error)
                 } else {
                     self?.logger.debug("✅ Successfully opened Phantom app")
@@ -94,10 +157,10 @@ public class Phantom: NSObject, @unchecked Sendable {
     // MARK: - Step 2: Sign Message
     @objc
     public func signMessage(_ message: String, completion: @escaping @Sendable (Bool, String?) -> Void) {
-        guard PhantomState.shared.isConnected, !PhantomState.shared.session.isEmpty else {
+        guard isConnected, !session.isEmpty else {
             let error = "Not connected to Phantom"
             DispatchQueue.main.async {
-                PhantomState.shared.setError(error)
+                self.setError(error)
                 self.logger.error("Not connected to Phantom")
                 completion(false, error)
             }
@@ -107,7 +170,7 @@ public class Phantom: NSObject, @unchecked Sendable {
         guard let appURL = URL(string: "https://phantom.app/ul/v1/signMessage") else {
             let error = "Invalid Phantom URL"
             DispatchQueue.main.async {
-                PhantomState.shared.setError(error)
+                self.setError(error)
                 self.logger.error("Invalid Phantom URL")
                 completion(false, error)
             }
@@ -115,18 +178,18 @@ public class Phantom: NSObject, @unchecked Sendable {
         }
 
         DispatchQueue.main.async {
-            PhantomState.shared.setLoading(true)
-            PhantomState.shared.clearError()
+            self.setLoading(true)
+            self.clearError()
         }
 
         do {
             // Prepare the payload
             let messageData = message.data(using: .utf8)!
-            let messageBase58 = messageData.base58EncodedString
+            let messageBase58 = messageData.phantomBase58EncodedString
 
             let payload = [
                 "message": messageBase58,
-                "session": PhantomState.shared.session,
+                "session": session,
                 "display": "utf8"
             ]
 
@@ -135,8 +198,9 @@ public class Phantom: NSObject, @unchecked Sendable {
 
             var components = URLComponents(url: appURL, resolvingAgainstBaseURL: false)!
 
+            let dappPublicKey = userDefaults.string(forKey: Keys.dappPublicKey) ?? ""
             let queryItems = [
-                URLQueryItem(name: "dapp_encryption_public_key", value: PhantomState.shared.dappPublicKey),
+                URLQueryItem(name: "dapp_encryption_public_key", value: dappPublicKey),
                 URLQueryItem(name: "nonce", value: encryptedPayload.nonce),
                 URLQueryItem(name: "redirect_link", value: "phantomconnect://signed".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)),
                 URLQueryItem(name: "payload", value: encryptedPayload.data)
@@ -147,9 +211,9 @@ public class Phantom: NSObject, @unchecked Sendable {
             guard let finalURL = components.url else {
                 let error = "Failed to construct URL"
                 DispatchQueue.main.async {
-                    PhantomState.shared.setError(error)
+                    self.setError(error)
                     self.logger.error("Failed to construct URL")
-                    PhantomState.shared.setLoading(false)
+                    self.setLoading(false)
                     completion(false, error)
                 }
                 return
@@ -159,8 +223,8 @@ public class Phantom: NSObject, @unchecked Sendable {
                 DispatchQueue.main.async {
                     if !success {
                         let error = "Failed to open Phantom app"
-                        PhantomState.shared.setError(error)
-                        PhantomState.shared.setLoading(false)
+                        self?.setError(error)
+                        self?.setLoading(false)
                         completion(false, error)
                     } else {
                         completion(true, nil)
@@ -170,9 +234,9 @@ public class Phantom: NSObject, @unchecked Sendable {
         } catch {
             let errorMsg = "Failed to prepare message: \(error.localizedDescription)"
             DispatchQueue.main.async {
-                PhantomState.shared.setError(errorMsg)
+                self.setError(errorMsg)
                 self.logger.error("Failed to prepare message: \(error.localizedDescription)")
-                PhantomState.shared.setLoading(false)
+                self.setLoading(false)
                 completion(false, errorMsg)
             }
         }
@@ -180,7 +244,7 @@ public class Phantom: NSObject, @unchecked Sendable {
 
     // MARK: - Encryption Helper
     private func encryptPayload(_ data: Data) throws -> (data: String, nonce: String) {
-        guard let sharedSecret = PhantomState.shared.sharedSecret else {
+        guard let sharedSecret = self.sharedSecret else {
             throw PhantomError.noSharedSecret
         }
 
@@ -200,15 +264,20 @@ public class Phantom: NSObject, @unchecked Sendable {
         logger.debug("✅ SecretBox encryption successful, encrypted length: \(encrypted.count)")
 
         return (
-            data: encrypted.base58EncodedString,
-            nonce: nonce.base58EncodedString
+            data: encrypted.phantomBase58EncodedString,
+            nonce: nonce.phantomBase58EncodedString
         )
     }
 
     // MARK: - Disconnect
     @objc
     public func disconnect() {
-        PhantomState.shared.disconnect()
+        setConnected(false)
+        setPublicKey("")
+        userDefaults.set("", forKey: Keys.signature)
+        userDefaults.set("", forKey: Keys.errorMessage)
+        userDefaults.set("", forKey: Keys.session)
+        userDefaults.removeObject(forKey: Keys.sharedSecret)
     }
 }
 
@@ -221,12 +290,12 @@ public enum PhantomError: Int, Error {
 
 // MARK: - Base58 Encoding Extension
 extension Data {
-    var base58EncodedString: String {
-        return Base58.encode(self)
+    var phantomBase58EncodedString: String {
+        return PhantomBase58.encode(self)
     }
 
-    init?(base58Encoded string: String) {
-        guard let data = Base58.decode(string) else {
+    init?(phantomBase58Encoded string: String) {
+        guard let data = PhantomBase58.decode(string) else {
             return nil
         }
         self = data
@@ -234,7 +303,7 @@ extension Data {
 }
 
 // MARK: - Base58 Implementation
-struct Base58 {
+struct PhantomBase58 {
     private static let alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
     private static let base = alphabet.count
 

@@ -8,16 +8,29 @@
 import SwiftUI
 import os
 
-
 struct ContentView: View {
-    @StateObject private var phantomState = PhantomState.shared
     @State private var messageToSign = "Hello from PhantomConnect! Test message for signing."
     @State private var showingSignatureAlert = false
     @State private var debugLogs: [String] = []
+
+    // UserDefaults-backed state
+    @State private var isConnected = false
+    @State private var publicKey = ""
     @State private var isLoading = false
     @State private var errorMessage = ""
+    @State private var signature = ""
 
     private let logger = Logger(subsystem: "com.phantomconnect.app", category: "ContentView")
+    private let userDefaults = UserDefaults.standard
+
+    // Keys for UserDefaults
+    private enum Keys {
+        static let isConnected = "phantom_is_connected"
+        static let publicKey = "phantom_public_key"
+        static let isLoading = "phantom_is_loading"
+        static let errorMessage = "phantom_error_message"
+        static let signature = "phantom_signature"
+    }
 
     var body: some View {
         NavigationView {
@@ -32,8 +45,12 @@ struct ContentView: View {
             .padding()
             .navigationBarHidden(true)
         }
-        .onReceive(phantomState.$signature) { newSignature in
-            if !newSignature.isEmpty {
+        .onAppear {
+            loadUserDefaults()
+            startPollingUserDefaults()
+        }
+        .onChange(of: signature) { newSignature in
+            if !newSignature.isEmpty && !showingSignatureAlert {
                 showingSignatureAlert = true
                 addDebugLog("✅ Message signed successfully!")
             }
@@ -43,6 +60,40 @@ struct ContentView: View {
             }
         } message: {
             Text("Your message has been successfully signed!")
+        }
+    }
+
+    private func loadUserDefaults() {
+        isConnected = userDefaults.bool(forKey: Keys.isConnected)
+        publicKey = userDefaults.string(forKey: Keys.publicKey) ?? ""
+        isLoading = userDefaults.bool(forKey: Keys.isLoading)
+        errorMessage = userDefaults.string(forKey: Keys.errorMessage) ?? ""
+        signature = userDefaults.string(forKey: Keys.signature) ?? ""
+    }
+
+    private func startPollingUserDefaults() {
+        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            let newIsConnected = userDefaults.bool(forKey: Keys.isConnected)
+            let newPublicKey = userDefaults.string(forKey: Keys.publicKey) ?? ""
+            let newIsLoading = userDefaults.bool(forKey: Keys.isLoading)
+            let newErrorMessage = userDefaults.string(forKey: Keys.errorMessage) ?? ""
+            let newSignature = userDefaults.string(forKey: Keys.signature) ?? ""
+
+            if newIsConnected != isConnected {
+                isConnected = newIsConnected
+            }
+            if newPublicKey != publicKey {
+                publicKey = newPublicKey
+            }
+            if newIsLoading != isLoading {
+                isLoading = newIsLoading
+            }
+            if newErrorMessage != errorMessage {
+                errorMessage = newErrorMessage
+            }
+            if newSignature != signature {
+                signature = newSignature
+            }
         }
     }
 
@@ -67,7 +118,7 @@ struct ContentView: View {
         VStack(spacing: 15) {
             HStack {
                 Circle()
-                    .fill(phantomState.isConnected ? Color.green : Color.gray)
+                    .fill(isConnected ? Color.green : Color.gray)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Text("1")
@@ -85,14 +136,14 @@ struct ContentView: View {
 
                 Spacer()
 
-                if phantomState.isConnected {
+                if isConnected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                         .font(.title2)
                 }
             }
 
-            if phantomState.isConnected {
+            if isConnected {
                 connectedWalletInfo
             } else {
                 connectButton
@@ -108,7 +159,7 @@ struct ContentView: View {
             Text("Connected Wallet:")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Text(phantomState.publicKey)
+            Text(publicKey)
                 .font(.system(.caption, design: .monospaced))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -122,17 +173,15 @@ struct ContentView: View {
     private var connectButton: some View {
         Button(action: {
             Phantom.shared.connect { success, error in
-                DispatchQueue.main.async {
-                    if success {
-                        addDebugLog("✅ Connection request sent!")
-                    } else if let error = error {
-                        addDebugLog("❌ Connection failed: \(error)")
-                    }
+                if success {
+                    addDebugLog("✅ Connection request sent!")
+                } else if let error = error {
+                    addDebugLog("❌ Connection failed: \(error)")
                 }
             }
         }) {
             HStack {
-                if phantomState.isLoading {
+                if isLoading {
                     ProgressView()
                         .scaleEffect(0.8)
                 } else {
@@ -146,14 +195,14 @@ struct ContentView: View {
             .foregroundColor(.white)
             .cornerRadius(10)
         }
-        .disabled(phantomState.isLoading)
+        .disabled(isLoading)
     }
 
     private var signStepView: some View {
         VStack(spacing: 15) {
             HStack {
                 Circle()
-                    .fill(phantomState.isConnected ? (phantomState.signature.isEmpty ? Color.orange : Color.green) : Color.gray)
+                    .fill(isConnected ? (signature.isEmpty ? Color.orange : Color.green) : Color.gray)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Text("2")
@@ -171,14 +220,14 @@ struct ContentView: View {
 
                 Spacer()
 
-                if !phantomState.signature.isEmpty {
+                if !signature.isEmpty {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                         .font(.title2)
                 }
             }
 
-            if phantomState.isConnected {
+            if isConnected {
                 signMessageContent
             } else {
                 Text("Complete step 1 first")
@@ -189,7 +238,7 @@ struct ContentView: View {
         .padding()
         .background(Color.gray.opacity(0.05))
         .cornerRadius(15)
-        .opacity(phantomState.isConnected ? 1.0 : 0.6)
+        .opacity(isConnected ? 1.0 : 0.6)
     }
 
     private var signMessageContent: some View {
@@ -199,17 +248,15 @@ struct ContentView: View {
 
             Button(action: {
                 Phantom.shared.signMessage(messageToSign) { success, error in
-                    DispatchQueue.main.async {
-                        if success {
-                            addDebugLog("✅ Sign request sent!")
-                        } else if let error = error {
-                            addDebugLog("❌ Sign request failed: \(error)")
-                        }
+                    if success {
+                        addDebugLog("✅ Sign request sent!")
+                    } else if let error = error {
+                        addDebugLog("❌ Sign request failed: \(error)")
                     }
                 }
             }) {
                 HStack {
-                    if phantomState.isLoading {
+                    if isLoading {
                         ProgressView()
                             .scaleEffect(0.8)
                     } else {
@@ -223,9 +270,9 @@ struct ContentView: View {
                 .foregroundColor(.white)
                 .cornerRadius(10)
             }
-            .disabled(phantomState.isLoading || messageToSign.isEmpty)
+            .disabled(isLoading || messageToSign.isEmpty)
 
-            if !phantomState.signature.isEmpty {
+            if !signature.isEmpty {
                 signatureDisplay
             }
         }
@@ -236,7 +283,7 @@ struct ContentView: View {
             Text("Signature:")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            Text(phantomState.signature)
+            Text(signature)
                 .font(.system(.caption, design: .monospaced))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -248,8 +295,8 @@ struct ContentView: View {
 
     @ViewBuilder
     private var errorView: some View {
-        if !phantomState.errorMessage.isEmpty {
-            Text(phantomState.errorMessage)
+        if !errorMessage.isEmpty {
+            Text(errorMessage)
                 .foregroundColor(.red)
                 .padding()
                 .background(Color.red.opacity(0.1))
@@ -308,7 +355,7 @@ struct ContentView: View {
 
     @ViewBuilder
     private var disconnectButton: some View {
-        if phantomState.isConnected {
+        if isConnected {
             Button("Disconnect") {
                 Phantom.shared.disconnect()
                 addDebugLog("Wallet disconnected")
