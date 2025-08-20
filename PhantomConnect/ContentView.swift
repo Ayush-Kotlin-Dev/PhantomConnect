@@ -13,17 +13,25 @@ struct ContentView: View {
     @State private var showingSignatureAlert = false
     @State private var debugLogs: [String] = []
 
-    // UserDefaults-backed state
+    // Phantom UserDefaults-backed state
     @State private var isConnected = false
     @State private var publicKey = ""
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var signature = ""
+    
+    // Reown UserDefaults-backed state
+    @State private var reownIsConnected = false
+    @State private var reownWalletAddress = ""
+    @State private var reownIsLoading = false
+    @State private var reownErrorMessage = ""
+    @State private var reownSignature = ""
+    @State private var reownWalletName = ""
 
     private let logger = Logger(subsystem: "com.phantomconnect.app", category: "ContentView")
     private let userDefaults = UserDefaults.standard
 
-    // Keys for UserDefaults
+    // Keys for UserDefaults - Phantom
     private enum Keys {
         static let isConnected = "phantom_is_connected"
         static let publicKey = "phantom_public_key"
@@ -31,16 +39,26 @@ struct ContentView: View {
         static let errorMessage = "phantom_error_message"
         static let signature = "phantom_signature"
     }
+    
+    // Keys for UserDefaults - Reown
+    private enum ReownKeys {
+        static let isConnected = "reown_is_connected"
+        static let walletAddress = "reown_wallet_address"
+        static let isLoading = "reown_is_loading"
+        static let errorMessage = "reown_error_message"
+        static let signature = "reown_signature"
+        static let walletName = "reown_wallet_name"
+    }
 
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
                 headerView
-                connectStepView
+                walletConnectionSection
                 signStepView
                 errorView
                 debugLogView
-                disconnectButton
+                disconnectButtons
             }
             .padding()
             .navigationBarHidden(true)
@@ -52,7 +70,13 @@ struct ContentView: View {
         .onChange(of: signature) { newSignature in
             if !newSignature.isEmpty && !showingSignatureAlert {
                 showingSignatureAlert = true
-                addDebugLog("✅ Message signed successfully!")
+                addDebugLog("✅ Phantom message signed successfully!")
+            }
+        }
+        .onChange(of: reownSignature) { newSignature in
+            if !newSignature.isEmpty && !showingSignatureAlert {
+                showingSignatureAlert = true
+                addDebugLog("✅ Reown message signed successfully!")
             }
         }
         .alert("Message Signed", isPresented: $showingSignatureAlert) {
@@ -64,15 +88,25 @@ struct ContentView: View {
     }
 
     private func loadUserDefaults() {
+        // Phantom
         isConnected = userDefaults.bool(forKey: Keys.isConnected)
         publicKey = userDefaults.string(forKey: Keys.publicKey) ?? ""
         isLoading = userDefaults.bool(forKey: Keys.isLoading)
         errorMessage = userDefaults.string(forKey: Keys.errorMessage) ?? ""
         signature = userDefaults.string(forKey: Keys.signature) ?? ""
+        
+        // Reown
+        reownIsConnected = userDefaults.bool(forKey: ReownKeys.isConnected)
+        reownWalletAddress = userDefaults.string(forKey: ReownKeys.walletAddress) ?? ""
+        reownIsLoading = userDefaults.bool(forKey: ReownKeys.isLoading)
+        reownErrorMessage = userDefaults.string(forKey: ReownKeys.errorMessage) ?? ""
+        reownSignature = userDefaults.string(forKey: ReownKeys.signature) ?? ""
+        reownWalletName = userDefaults.string(forKey: ReownKeys.walletName) ?? ""
     }
 
     private func startPollingUserDefaults() {
         Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            // Phantom state
             let newIsConnected = userDefaults.bool(forKey: Keys.isConnected)
             let newPublicKey = userDefaults.string(forKey: Keys.publicKey) ?? ""
             let newIsLoading = userDefaults.bool(forKey: Keys.isLoading)
@@ -94,6 +128,33 @@ struct ContentView: View {
             if newSignature != signature {
                 signature = newSignature
             }
+            
+            // Reown state
+            let newReownIsConnected = userDefaults.bool(forKey: ReownKeys.isConnected)
+            let newReownWalletAddress = userDefaults.string(forKey: ReownKeys.walletAddress) ?? ""
+            let newReownIsLoading = userDefaults.bool(forKey: ReownKeys.isLoading)
+            let newReownErrorMessage = userDefaults.string(forKey: ReownKeys.errorMessage) ?? ""
+            let newReownSignature = userDefaults.string(forKey: ReownKeys.signature) ?? ""
+            let newReownWalletName = userDefaults.string(forKey: ReownKeys.walletName) ?? ""
+
+            if newReownIsConnected != reownIsConnected {
+                reownIsConnected = newReownIsConnected
+            }
+            if newReownWalletAddress != reownWalletAddress {
+                reownWalletAddress = newReownWalletAddress
+            }
+            if newReownIsLoading != reownIsLoading {
+                reownIsLoading = newReownIsLoading
+            }
+            if newReownErrorMessage != reownErrorMessage {
+                reownErrorMessage = newReownErrorMessage
+            }
+            if newReownSignature != reownSignature {
+                reownSignature = newReownSignature
+            }
+            if newReownWalletName != reownWalletName {
+                reownWalletName = newReownWalletName
+            }
         }
     }
 
@@ -103,22 +164,22 @@ struct ContentView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.purple)
 
-            Text("Phantom Connect")
+            Text("Multi-Wallet Connect")
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
-            Text("Two-step wallet connection")
+            Text("Connect via Phantom or WalletConnect")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
         .padding(.top, 20)
     }
 
-    private var connectStepView: some View {
+    private var walletConnectionSection: some View {
         VStack(spacing: 15) {
             HStack {
                 Circle()
-                    .fill(isConnected ? Color.green : Color.gray)
+                    .fill((isConnected || reownIsConnected) ? Color.green : Color.gray)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Text("1")
@@ -129,14 +190,14 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Connect Wallet")
                         .font(.headline)
-                    Text("Get your wallet address")
+                    Text("Choose your preferred wallet")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
                 Spacer()
 
-                if isConnected {
+                if isConnected || reownIsConnected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                         .font(.title2)
@@ -144,65 +205,131 @@ struct ContentView: View {
             }
 
             if isConnected {
-                connectedWalletInfo
+                connectedPhantomWalletInfo
+            } else if reownIsConnected {
+                connectedReownWalletInfo
             } else {
-                connectButton
+                walletConnectionButtons
             }
         }
         .padding()
         .background(Color.gray.opacity(0.05))
         .cornerRadius(15)
     }
+    
+    private var walletConnectionButtons: some View {
+        VStack(spacing: 12) {
+            // Phantom Connect Button
+            Button(action: {
+                Phantom.shared.connect { success, error in
+                    if success {
+                        addDebugLog("✅ Phantom connection request sent!")
+                    } else if let error = error {
+                        addDebugLog("❌ Phantom connection failed: \(error)")
+                    }
+                }
+            }) {
+                HStack {
+                    if isLoading {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "link")
+                    }
+                    Text("Connect to Phantom")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.purple)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+            .disabled(isLoading || reownIsLoading)
+            
+            // WalletConnect Button
+            Button(action: {
+                ReownWallet.shared.presentWalletSelection { success, error in
+                    if success {
+                        addDebugLog("✅ WalletConnect selection presented!")
+                        // After presenting, attempt connection
+                        ReownWallet.shared.connect { connectSuccess, connectError in
+                            if connectSuccess {
+                                addDebugLog("✅ WalletConnect connection successful!")
+                            } else if let error = connectError {
+                                addDebugLog("❌ WalletConnect connection failed: \(error)")
+                            }
+                        }
+                    } else if let error = error {
+                        addDebugLog("❌ WalletConnect presentation failed: \(error)")
+                    }
+                }
+            }) {
+                HStack {
+                    if reownIsLoading {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "wallet.pass")
+                    }
+                    Text("WalletConnect")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(10)
+            }
+            .disabled(isLoading || reownIsLoading)
+        }
+    }
 
-    private var connectedWalletInfo: some View {
+    private var connectedPhantomWalletInfo: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("Connected Wallet:")
+            Text("Connected via Phantom:")
                 .font(.caption)
                 .foregroundColor(.secondary)
             Text(publicKey)
                 .font(.system(.caption, design: .monospaced))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color.gray.opacity(0.1))
+                .background(Color.purple.opacity(0.1))
                 .cornerRadius(8)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
     }
-
-    private var connectButton: some View {
-        Button(action: {
-            Phantom.shared.connect { success, error in
-                if success {
-                    addDebugLog("✅ Connection request sent!")
-                } else if let error = error {
-                    addDebugLog("❌ Connection failed: \(error)")
-                }
-            }
-        }) {
+    
+    private var connectedReownWalletInfo: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Connected via WalletConnect:")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
             HStack {
-                if isLoading {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "link")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Wallet: \(reownWalletName)")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    Text(reownWalletAddress)
+                        .font(.system(.caption, design: .monospaced))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                 }
-                Text("Connect to Phantom")
+                Spacer()
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.purple)
-            .foregroundColor(.white)
-            .cornerRadius(10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.blue.opacity(0.1))
+            .cornerRadius(8)
         }
-        .disabled(isLoading)
     }
 
     private var signStepView: some View {
         VStack(spacing: 15) {
             HStack {
                 Circle()
-                    .fill(isConnected ? (signature.isEmpty ? Color.orange : Color.green) : Color.gray)
+                    .fill((isConnected || reownIsConnected) ? 
+                          ((!signature.isEmpty || !reownSignature.isEmpty) ? Color.green : Color.orange) : Color.gray)
                     .frame(width: 30, height: 30)
                     .overlay(
                         Text("2")
@@ -220,14 +347,14 @@ struct ContentView: View {
 
                 Spacer()
 
-                if !signature.isEmpty {
+                if !signature.isEmpty || !reownSignature.isEmpty {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                         .font(.title2)
                 }
             }
 
-            if isConnected {
+            if isConnected || reownIsConnected {
                 signMessageContent
             } else {
                 Text("Complete step 1 first")
@@ -238,7 +365,7 @@ struct ContentView: View {
         .padding()
         .background(Color.gray.opacity(0.05))
         .cornerRadius(15)
-        .opacity(isConnected ? 1.0 : 0.6)
+        .opacity((isConnected || reownIsConnected) ? 1.0 : 0.6)
     }
 
     private var signMessageContent: some View {
@@ -246,48 +373,97 @@ struct ContentView: View {
             TextField("Message to sign", text: $messageToSign)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
 
-            Button(action: {
-                Phantom.shared.signMessage(messageToSign) { success, error in
-                    if success {
-                        addDebugLog("✅ Sign request sent!")
-                    } else if let error = error {
-                        addDebugLog("❌ Sign request failed: \(error)")
+            if isConnected {
+                Button(action: {
+                    Phantom.shared.signMessage(messageToSign) { success, error in
+                        if success {
+                            addDebugLog("✅ Phantom sign request sent!")
+                        } else if let error = error {
+                            addDebugLog("❌ Phantom sign request failed: \(error)")
+                        }
                     }
-                }
-            }) {
-                HStack {
-                    if isLoading {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "signature")
+                }) {
+                    HStack {
+                        if isLoading {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "signature")
+                        }
+                        Text("Sign with Phantom")
                     }
-                    Text("Sign Message")
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.purple)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.orange)
-                .foregroundColor(.white)
-                .cornerRadius(10)
+                .disabled(isLoading || reownIsLoading || messageToSign.isEmpty)
             }
-            .disabled(isLoading || messageToSign.isEmpty)
+            
+            if reownIsConnected {
+                Button(action: {
+                    ReownWallet.shared.signMessage(messageToSign) { success, error in
+                        if success {
+                            addDebugLog("✅ WalletConnect sign request sent!")
+                        } else if let error = error {
+                            addDebugLog("❌ WalletConnect sign request failed: \(error)")
+                        }
+                    }
+                }) {
+                    HStack {
+                        if reownIsLoading {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "signature")
+                        }
+                        Text("Sign with WalletConnect")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                .disabled(isLoading || reownIsLoading || messageToSign.isEmpty)
+            }
 
             if !signature.isEmpty {
-                signatureDisplay
+                phantomSignatureDisplay
+            }
+            
+            if !reownSignature.isEmpty {
+                reownSignatureDisplay
             }
         }
     }
 
-    private var signatureDisplay: some View {
+    private var phantomSignatureDisplay: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("Signature:")
+            Text("Phantom Signature:")
                 .font(.caption)
                 .foregroundColor(.secondary)
             Text(signature)
                 .font(.system(.caption, design: .monospaced))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color.gray.opacity(0.1))
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(8)
+                .lineLimit(3)
+        }
+    }
+    
+    private var reownSignatureDisplay: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("WalletConnect Signature:")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Text(reownSignature)
+                .font(.system(.caption, design: .monospaced))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.blue.opacity(0.1))
                 .cornerRadius(8)
                 .lineLimit(3)
         }
@@ -296,7 +472,15 @@ struct ContentView: View {
     @ViewBuilder
     private var errorView: some View {
         if !errorMessage.isEmpty {
-            Text(errorMessage)
+            Text("Phantom: \(errorMessage)")
+                .foregroundColor(.red)
+                .padding()
+                .background(Color.red.opacity(0.1))
+                .cornerRadius(10)
+        }
+        
+        if !reownErrorMessage.isEmpty {
+            Text("WalletConnect: \(reownErrorMessage)")
                 .foregroundColor(.red)
                 .padding()
                 .background(Color.red.opacity(0.1))
@@ -354,13 +538,23 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private var disconnectButton: some View {
-        if isConnected {
-            Button("Disconnect") {
-                Phantom.shared.disconnect()
-                addDebugLog("Wallet disconnected")
+    private var disconnectButtons: some View {
+        HStack(spacing: 12) {
+            if isConnected {
+                Button("Disconnect Phantom") {
+                    Phantom.shared.disconnect()
+                    addDebugLog("Phantom wallet disconnected")
+                }
+                .foregroundColor(.red)
             }
-            .foregroundColor(.red)
+            
+            if reownIsConnected {
+                Button("Disconnect WalletConnect") {
+                    ReownWallet.shared.disconnect()
+                    addDebugLog("WalletConnect wallet disconnected")
+                }
+                .foregroundColor(.red)
+            }
         }
     }
 
