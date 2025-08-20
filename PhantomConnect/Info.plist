@@ -30,11 +30,29 @@
             <key>CFBundleURLName</key>
             <string>com.phantomconnect.app</string>
         </dict>
+        <dict>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>wc</string>
+            </array>
+            <key>CFBundleURLName</key>
+            <string>com.phantomconnect.walletconnect</string>
+        </dict>
     </array>
     <key>LSApplicationQueriesSchemes</key>
     <array>
         <string>phantom</string>
         <string>https</string>
+        <string>metamask</string>
+        <string>trust</string>
+        <string>safe</string>
+        <string>rainbow</string>
+        <string>uniswap</string>
+        <string>coinbase</string>
+        <string>imtoken</string>
+        <string>argent</string>
+        <string>walletconnect</string>
+        <string>wc</string>
     </array>
     <key>UIRequiredDeviceCapabilities</key>
     <array>

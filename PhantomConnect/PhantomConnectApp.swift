@@ -19,6 +19,12 @@ struct PhantomConnectApp: App {
     }
     
     private func handleAppDeepLink(_ url: URL) {
-        _ = PhantomDeepLinkHandler.shared.handleURL(url)
+        // Try Phantom deep link first
+        if PhantomDeepLinkHandler.shared.handleURL(url) {
+            return
+        }
+        
+        // Try Reown deep link if Phantom didn't handle it
+        _ = ReownDeepLinkHandler.shared.handleURL(url)
     }
 }
